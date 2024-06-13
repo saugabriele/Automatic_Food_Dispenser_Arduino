@@ -11,11 +11,12 @@
 #define servoPIN D8
 #define ssid "HUAWEI P20"
 #define password "1f657a642e3b"
-#define DEV_ID 11
-#define DISPENSER_MEASURE 60000
+#define DEV_ID 12
+#define DISPENSER_MEASURE 6000
 #define PIR_MEASURE 3000
 #define MAX_MEASURES 15
 #define SCHEDULE_DEBOUNCE 80000
+#define MAX_DISTANCE 56
 
 typedef struct {
   float value;
@@ -27,13 +28,13 @@ long lastMeasure_dispenser = 0;
 long lastMeasure_pirSensor = 0;
 long last_schedule_hour = 0;
 int numMeasures_dispenser = 0;
-int numMeasures_pir_sensor = 0;  //openings
+int numMeasures_pir_sensor = 0;
 int schedule_minute = 0;
-int scheduledHours[] = { 4, 7, 10, 13, 16, 19 };
+int scheduledHours[] = { 4, 7, 10, 14, 16, 19 };
 Measure measures_disp[MAX_MEASURES];
 Measure measures_pir_sensor[MAX_MEASURES];
 String IP = "192.168.43.65";
-String PORT = "5000";
+String PORT = "80";
 String ENDPOINT = "/sendData";
 String SERVER_URL = "http://" + IP + ":" + PORT + ENDPOINT;
 
@@ -73,20 +74,20 @@ void reconnect() {
 
 void reconnectWiFi() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFiconnection lost. Reconnecting...");
+    Serial.println("WiFi connection lost. Reconnecting...");
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
       Serial.println("Reconnecting...");
     }
-    Serial.println("Reconnected to the WiFinetwork");
+    Serial.println("Reconnected to the WiFi network");
   }
 }
 
 void setup() {
   // Begin Serial communication at a baud rate of 9600
   Serial.begin(9600);
-  // Define the trigPin as Output and echoPinas Input
+  // Define the trigPin as Output and echoPin as Input
   pinMode(pirPin, INPUT);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -111,9 +112,38 @@ void loop() {
   if (minute(n) == schedule_minute && (now - last_schedule_hour) > SCHEDULE_DEBOUNCE) {
     for (int i = 0; i < 6; i++) {
       if (hour(n) == scheduledHours[i]) {
-        feed();
-        last_schedule_hour = now;
-        break;
+        float distance = getDistance();
+
+        if(distance< MAX_DISTANCE) {
+          Serial.println(distance);
+          while(1)
+          {
+              int pirState = digitalRead(pirPin);
+              measures_pir_sensor[numMeasures_pir_sensor].value = pirState;
+              measures_pir_sensor[numMeasures_pir_sensor].date = getNtpTime();
+              numMeasures_pir_sensor++;
+
+              if(pirState){
+                feed();
+                last_schedule_hour = now;
+                Serial.println("Feeded");
+                break;
+              }
+              
+              if (numMeasures_pir_sensor >= MAX_MEASURES) {
+                const char* type = "pir_status";
+                String s_id = String(DEV_ID);
+                sendData(measures_pir_sensor, numMeasures_pir_sensor, type, s_id);
+                numMeasures_pir_sensor = 0;
+              }
+
+              delay(3000);
+          }
+        }
+        else{
+          Serial.println("Food dispenser empty.");
+          last_schedule_hour = now;
+        }
       }
     }
   }
@@ -140,9 +170,10 @@ void loop() {
     measures_pir_sensor[numMeasures_pir_sensor].value = pirState;
     measures_pir_sensor[numMeasures_pir_sensor].date = getNtpTime();
     numMeasures_pir_sensor++;
+    lastMeasure_pirSensor = now;
     if (pirState) {
       Serial.print("Pir State:");
-      Serial.print(pirState);
+      Serial.println(pirState);
       feed();
 
       remote_feeding_request = 0;
@@ -155,7 +186,8 @@ void loop() {
     }
   }
 
-  //client.publish(topic_distance, String(distance).c_str());
+  
+
   delay(1000);
 
   reconnectWiFi();

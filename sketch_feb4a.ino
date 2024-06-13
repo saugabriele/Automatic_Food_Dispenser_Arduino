@@ -12,7 +12,7 @@
 #define ssid "HUAWEI P20"
 #define password "1f657a642e3b"
 #define DEV_ID 12
-#define DISPENSER_MEASURE 6000
+#define DISPENSER_MEASURE 60000
 #define PIR_MEASURE 3000
 #define MAX_MEASURES 15
 #define SCHEDULE_DEBOUNCE 80000
@@ -30,7 +30,7 @@ long last_schedule_hour = 0;
 int numMeasures_dispenser = 0;
 int numMeasures_pir_sensor = 0;
 int schedule_minute = 0;
-int scheduledHours[] = { 4, 7, 10, 14, 16, 19 };
+int scheduledHours[] = { 4, 7, 10, 13, 16, 19 };
 Measure measures_disp[MAX_MEASURES];
 Measure measures_pir_sensor[MAX_MEASURES];
 String IP = "192.168.43.65";
